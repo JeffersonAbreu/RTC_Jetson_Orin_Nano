@@ -165,3 +165,81 @@ Após a reinicio do sistema verifique a hora
 ```bash
 timedatectl status
 ```
+
+
+Reinstalar o sincronizador ntp:
+```bash
+sudo apt install --reinstall systemd-timesyncd
+```
+## Criando um serviço para atualizar o `RTC`
+
+
+O serviço `systemd-timesyncd` é projetado principalmente para sincronizar o relógio do sistema com a hora fornecida por servidores NTP. No entanto, ele não sincroniza automaticamente o relógio do RTC (Real Time Clock) no hardware. Para criar um serviço que será executado quando o `NTP` sincronizar, faça isso:
+
+1. **Crie um Serviço Systemd:**
+
+   Crie um arquivo chamado `sync-clock-rtc.service` com o seguinte conteúdo:
+   ```bash
+   sudo nano /etc/systemd/system/sync-clock-rtc.service
+   ```
+
+   ```ini
+   [Unit]
+   Description=Sync Hardware Clock with System Clock
+   After=time-sync.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/sbin/hwclock -w
+
+   [Install]
+   WantedBy=default.target
+   ```
+
+   Em seguida, recarregue o daemon systemd:
+
+   ```bash
+   sudo systemctl daemon-reload
+   ```
+
+   Ative o serviço para ser iniciado automaticamente:
+
+   ```bash
+   sudo systemctl enable sync-clock-rtc.service
+   ```
+
+   Inicie o serviço para sincronizar o RTC uma vez:
+
+   ```bash
+   sudo systemctl start sync-clock-rtc.service
+   ```
+
+A partir de agora, sempre que o sistema for iniciado, o serviço `sync-clock-rtc` será executado automaticamente para sincronizar o RTC com a hora do sistema. Certifique-se de testar isso e ajustar conforme necessário com base nas necessidades do seu sistema.
+
+2. **Para testar esse serviço**
+   
+   Para realizar o teste, vamos desativar o `ntp` e o serviço que criamos e alterar a data para uma que não seja atual
+   
+   ```bash
+   sudo timedatectl set-ntp 0
+   sudo timedatectl set-time "2024-03-06 18:23:00"
+   ```
+   
+   Após vamos ver o horário do sistema:
+   ```bash
+   timedatectl status
+   ```
+
+   Ative o `ntp` e veja que a hora do sistema é atualizada, mas não a do `RTC`:
+   ```bash
+   sudo timedatectl set-ntp 1
+   timedatectl status
+   ```
+
+   Reinicie e veja a hora depois:
+
+   ```bash
+   sudo reboot
+   timedatectl status
+   ```
+   
