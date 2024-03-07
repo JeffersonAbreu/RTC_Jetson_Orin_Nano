@@ -176,47 +176,116 @@ sudo apt install --reinstall systemd-timesyncd
 
 O serviço `systemd-timesyncd` é projetado principalmente para sincronizar o relógio do sistema com a hora fornecida por servidores NTP. No entanto, ele não sincroniza automaticamente o relógio do RTC (Real Time Clock) no hardware. Para criar um serviço que será executado quando o `NTP` sincronizar, faça isso:
 
-1. **Crie um Serviço Systemd:**
+### Criando o script
 
-   Crie um arquivo chamado `sync-clock-rtc.service` com o seguinte conteúdo:
-   ```bash
-   sudo nano /etc/systemd/system/sync-clock-rtc.service
-   ```
+Vamos criar o script `/usr/local/bin/update-rtc.sh` para quando o `systemd-timesyncd` for iniciado ou reiniciado com sucesso ele seja executado:
 
-   ```ini
-   [Unit]
-   Description=Sync Hardware Clock with System Clock
-   After=time-sync.target
+1. Crie um arquivo novo:
 
-   [Service]
-   Type=oneshot
-   ExecStart=/sbin/hwclock -w
+```bash
+sudo nano /usr/local/bin/update-rtc.sh
+```
 
-   [Install]
-   WantedBy=default.target
-   ```
+2. Copie e Cole no arquivo:
+```bash
+#!/bin/bash
 
-   Em seguida, recarregue o daemon systemd:
+# Verifica se a sincronização do sistema é "yes" e o serviço NTP está ativo
+if [ "$(timedatectl status | grep 'System clock synchronized: yes')" ] && \
+   [ "$(systemctl is-active systemd-timesyncd.service)" = "active" ]; then
+    # Atualiza o RTC com a data e hora do sistema
 
-   ```bash
-   sudo systemctl daemon-reload
-   ```
+    # Obtém a data e hora do RTC
+    rtc_datetime=$(sudo hwclock -r)
 
-   Ative o serviço para ser iniciado automaticamente:
+    # Obtém a data e hora atual do sistema
+    system_datetime=$(date -u +"%Y-%m-%d %H:%M")
 
-   ```bash
-   sudo systemctl enable sync-clock-rtc.service
-   ```
+    # Converte o formato do RTC para corresponder ao formato do sistema
+    rtc_datetime=$(date -d "$rtc_datetime" -u +"%Y-%m-%d %H:%M")
 
-   Inicie o serviço para sincronizar o RTC uma vez:
+#    echo "RTC: $rtc_datetime"
+#    echo "SYS: $system_datetime"
 
-   ```bash
-   sudo systemctl start sync-clock-rtc.service
-   ```
+    system_timestamp=$(date -d "$system_datetime"  +"%s")
+
+    # Obtém a data e hora do RTC
+    rtc_timestamp=$(date -d "$rtc_datetime"  +"%s")
+
+#    echo "RTC: $rtc_timestamp"
+#    echo "SYS: $system_timestamp"
+
+    # Compara as datas e horas
+    if [ "$system_timestamp" -gt "$rtc_timestamp" ]; then
+        # A data e hora do sistema são mais recentes, então atualiza o RTC
+        sudo hwclock -w -u
+
+        # Opcional: registra a sincronização do RTC
+        logger -t "RTC" "Sincronização do RTC realizada com sucesso."
+        echo "RTC sincronizado com sucesso!"
+    else
+        # A data e hora do RTC são mais recentes ou iguais, então não faz nada
+        logger -t "RTC" "Sincronização do RTC ignorada - a data e hora do RTC são mais recentes ou iguai>
+        echo "RTC já está sincronizado ou possui data/hora mais recentes."
+    fi
+else
+    sudo systemctl start sync-hwclock.service
+    echo "Sincronização do sistema não ativa ou serviço NTP inativo, pulando atualização do RTC."
+fi
+```
+
+4. Salve e feche.
+
+5. Dê permissão para executar
+```bash
+sudo chmod +x /usr/local/bin/update-rtc.sh
+```
+
+### Criando o serviço
+
+1. Crie um novo arquivo de serviço do systemd para monitorar o `systemd-timesyncd`. Execute o seguinte comando:
+
+```bash
+sudo nano /etc/systemd/system/update-rtc-on-timesyncd.service
+```
+
+2. Adicione o seguinte conteúdo ao arquivo:
+
+```ini
+[Unit]
+Description=Update RTC on systemd-timesyncd success
+Wants=systemd-timesyncd.service
+After=systemd-timesyncd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-rtc.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Isso configura um serviço que será executado quando o `systemd-timesyncd` for iniciado ou reiniciado com sucesso.
+
+3. Salve e feche o arquivo.
+
+4. Recarregue o systemd para ler as alterações:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+5. Ative o novo serviço para que ele seja iniciado automaticamente:
+
+```bash
+sudo systemctl enable update-rtc-on-timesyncd.service
+```
+
+Agora, o script `/usr/local/bin/update-rtc.sh` será executado automaticamente sempre que o serviço `systemd-timesyncd` for iniciado ou reiniciado com sucesso. Certifique-se de testar isso reiniciando o serviço `systemd-timesyncd` ou reiniciando o sistema.
 
 A partir de agora, sempre que o sistema for iniciado, o serviço `sync-clock-rtc` será executado automaticamente para sincronizar o RTC com a hora do sistema. Certifique-se de testar isso e ajustar conforme necessário com base nas necessidades do seu sistema.
 
-2. **Para testar esse serviço**
+**Para testar esse serviço**
    
    Para realizar o teste, vamos desativar o `ntp` e o serviço que criamos e alterar a data para uma que não seja atual
    
