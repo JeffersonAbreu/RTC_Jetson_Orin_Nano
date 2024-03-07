@@ -125,3 +125,43 @@ Se quiser restaurar todas as alterações, você pode habilitar o NTP.
 ```bash
 sudo timedatectl set-ntp 1
 ```
+
+## SCRIPT para fazer esse passos de uma vez
+
+Primeiro defina a data e hora com este comando:
+
+```bash
+sudo date --set="2024-03-06 18:23:00"
+timedatectl status
+```
+
+Agora execute os passos:
+
+```bash
+sudo sed -i 's/ATTR{hctosys}=="1"/ATTR{hctosys}=="0"/' /etc/udev/rules.d/50-udev-default.rules
+sudo hwclock -w -f /dev/rtc0
+touch sync-hwclock.service
+echo "[Unit]" >> sync-hwclock.service
+echo "Description=Sync Hardware Clock with System Clock" >> sync-hwclock.service
+echo "" >> sync-hwclock.service
+echo "[Service]" >> sync-hwclock.service
+echo "Type=oneshot" >> sync-hwclock.service
+echo "ExecStart=/sbin/hwclock --hctosys" >> sync-hwclock.service
+echo "" >> sync-hwclock.service
+echo "[Install]" >> sync-hwclock.service
+echo "WantedBy=multi-user.target" >> sync-hwclock.service
+sudo mv sync-hwclock.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable sync-hwclock.service
+sudo systemctl start sync-hwclock.service
+```
+
+Reinicie o sistema:
+```bash
+sudo reboot
+```
+
+Após a reinicio do sistema verifique a hora
+```bash
+timedatectl status
+```
