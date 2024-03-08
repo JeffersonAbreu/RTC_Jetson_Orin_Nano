@@ -245,7 +245,7 @@ Description=Timer para Atualização do RTC
 [Timer]
 # A cada minuto
 OnCalendar=*-*-* *:*:*
-Unit=my-ntp-sync-timer.service
+Unit=sync-rtc-on-system.service
 
 [Install]
 WantedBy=timers.target
