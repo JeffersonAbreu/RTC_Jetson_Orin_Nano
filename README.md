@@ -1,3 +1,4 @@
+
 # RTC_Jetson_Orin_Nano
 Configuração do RTC - Jetson Orin Nano
 ### Verifique o RTC padrão
@@ -7,6 +8,18 @@ ll /dev/rtc*
 
 ### Mudando o RTC padrão para rtc0
 Para alterar o valor de `ATTR{hctosys}` de `1` para `0` no arquivo de regras do udev, você pode usar o comando `sudo sed`. Aqui está um exemplo de como fazer isso:
+
+Localize o `50-udev-default.rules`, que pode está em lugares diferentes de acordo com a versão do sistema.
+```bash
+ls /etc/udev/rules.d/50-udev*
+```
+OU
+```bash
+ls /usr/lib/udev/rules.d/50-udev*
+```
+
+> [!WARNING] 
+> Talvez o arquivo esteja em `/usr/lib/udev/rules.d/`
 
 ```bash
 sudo sed -i 's/ATTR{hctosys}=="1"/ATTR{hctosys}=="0"/' /etc/udev/rules.d/50-udev-default.rules
